@@ -29,7 +29,12 @@ contract Challenge0Test is Test {
         //////////////////////////////*/
 
         //============================//
-        //VToken target = new VToken();
+        // SOLUTION:
+        // The approve() function in the target contract is vulnerable. It is modified from the
+        // OpenZeppelin version by taking an extra parameter and by removing the check that
+        // ensures that only the owner can issue an approve action.
+        // As a result, the attacker can approve on behalf of Vitalik and transfer all the balance
+        // to their own account.
         VToken(token).approve(vitalik, player, 100 ether);
         VToken(token).transferFrom(vitalik, player, 100 ether);
 

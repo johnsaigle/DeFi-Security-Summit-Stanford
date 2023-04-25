@@ -1,3 +1,13 @@
+This repository contains my solutions to the Secureum CTF Workshop. I am using the `foundry` variation of the CTF. Solutions are in `test/`.
+
+Progress:
+
+- [x] Challenge0
+- [ ] Challenge1
+- [ ] Challenge2
+- [ ] Challenge3
+
+---  
 # **Secureum A-MAZE-X Stanford**
 ## **A Smart Contract Security *Capture the Flag* Workshop**
 
