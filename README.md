@@ -1,11 +1,11 @@
-This repository contains my solutions to the Secureum CTF Workshop. I am using the `foundry` variation of the CTF. Solutions are in `test/`.
+This repository contains my solutions to the Secureum CTF Workshop. I am using the `foundry` variation of the CTF. Solutions are in `test/`. Explanations for the solutions are included in-line as code comments.
 
 Progress:
 
 - [x] Challenge0
 - [x] Challenge1
 - [x] Challenge2
-- [ ] Challenge3
+- [x] Challenge3
 
 ---  
 # **Secureum A-MAZE-X Stanford**
