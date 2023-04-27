@@ -3,8 +3,8 @@ This repository contains my solutions to the Secureum CTF Workshop. I am using t
 Progress:
 
 - [x] Challenge0
-- [ ] Challenge1
-- [ ] Challenge2
+- [x] Challenge1
+- [x] Challenge2
 - [ ] Challenge3
 
 ---  
